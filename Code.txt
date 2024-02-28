@@ -1,0 +1,193 @@
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.util.Scanner;
+import java.util.HashSet;
+import java.util.Set;
+
+public class StudentManagement {
+    private static final String URL = "jdbc:mysql://localhost:3306/studentdb";
+    private static final String USER = "root";
+    private static final String PASSWORD = "7698";
+    private static final Set<Integer> deletedIds = new HashSet<>();
+
+    public static Connection getConnection() throws SQLException {
+        return DriverManager.getConnection(URL, USER, PASSWORD);
+    }
+
+    public static void getAllStudents() {
+        try (Connection connection = getConnection();
+             Statement statement = connection.createStatement()) {
+            String query = "SELECT registerno, name, department FROM students";
+            ResultSet resultSet = statement.executeQuery(query);
+
+            while (resultSet.next()) {
+                int registerno = resultSet.getInt("registerno");
+                String name = resultSet.getString("name");
+                String department = resultSet.getString("department");
+
+                System.out.println("Registration Number: " + registerno);
+                System.out.println("Name: " + name);
+                System.out.println("Department: " + department);
+                System.out.println("-----------------------------------");
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public static void addStudent() {
+        try (Connection connection = getConnection();
+             PreparedStatement statement = connection.prepareStatement(
+                     "INSERT INTO students (registerno, name, department) VALUES (?, ?, ?)")) {
+
+            int registerno;
+            if (!deletedIds.isEmpty()) {
+                registerno = deletedIds.iterator().next();
+                deletedIds.remove(registerno);
+            } else {
+                registerno = generateNewRegistrationNumber();
+            }
+
+            Scanner scanner = new Scanner(System.in);
+            System.out.println("Enter student name:");
+            String name = scanner.nextLine();
+            System.out.println("Enter student department:");
+            String department = scanner.nextLine();
+
+            statement.setInt(1, registerno);
+            statement.setString(2, name);
+            statement.setString(3, department);
+
+            int rowsInserted = statement.executeUpdate();
+            if (rowsInserted > 0) {
+                System.out.println("A new student was added successfully!");
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public static void updateStudent() {
+        try (Connection connection = getConnection()) {
+            Scanner scanner = new Scanner(System.in);
+            System.out.println("Enter student Registration Number to update:");
+            int registerno = scanner.nextInt();
+            scanner.nextLine();
+
+            System.out.println("Select the fields to update (comma separated):");
+            System.out.println("1. Name");
+            System.out.println("2. Department");
+            String[] fieldsToUpdate = scanner.nextLine().split(",");
+
+            StringBuilder updateQuery = new StringBuilder("UPDATE students SET");
+            for (String field : fieldsToUpdate) {
+                switch (field.trim()) {
+                    case "1":
+                        updateQuery.append(" name=?,");
+                        break;
+                    case "2":
+                        updateQuery.append(" department=?,");
+                        break;
+                    default:
+                        System.out.println("Invalid field choice: " + field.trim());
+                        return;
+                }
+            }
+            updateQuery.deleteCharAt(updateQuery.length() - 1);
+            updateQuery.append(" WHERE registerno=?");
+
+            PreparedStatement statement = connection.prepareStatement(updateQuery.toString());
+
+            int parameterIndex = 1;
+            for (String field : fieldsToUpdate) {
+                switch (field.trim()) {
+                    case "1":
+                        System.out.println("Enter new name:");
+                        statement.setString(parameterIndex++, scanner.nextLine());
+                        break;
+                    case "2":
+                        System.out.println("Enter new department:");
+                        statement.setString(parameterIndex++, scanner.nextLine());
+                        break;
+                }
+            }
+            statement.setInt(parameterIndex, registerno);
+
+            int rowsUpdated = statement.executeUpdate();
+            if (rowsUpdated > 0) {
+                System.out.println("Student information was updated successfully!");
+            } else {
+                System.out.println("No student found with the provided Registration Number.");
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public static void deleteStudent() {
+        try (Connection connection = getConnection();
+             PreparedStatement statement = connection.prepareStatement(
+                     "DELETE FROM students WHERE registerno=?")) {
+            Scanner scanner = new Scanner(System.in);
+            System.out.println("Enter student Registration Number to delete:");
+            int registerno = scanner.nextInt();
+
+            statement.setInt(1, registerno);
+            int rowsDeleted = statement.executeUpdate();
+            if (rowsDeleted > 0) {
+                System.out.println("Student was deleted successfully!");
+                deletedIds.add(registerno);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public static int generateNewRegistrationNumber() {
+        // Implement your logic to generate a new unique registration number
+        // This is just a placeholder
+        return 0;
+    }
+
+    public static void main(String[] args) {
+        Scanner scanner = new Scanner(System.in);
+
+        while (true) {
+            System.out.println("\nMenu:");
+            System.out.println("1. View all students");
+            System.out.println("2. Add a student");
+            System.out.println("3. Update a student");
+            System.out.println("4. Delete a student");
+            System.out.println("5. Exit");
+            System.out.print("Enter your choice: ");
+
+            int choice = scanner.nextInt();
+            scanner.nextLine();
+
+            switch (choice) {
+                case 1:
+                    System.out.println("\nAll Students:");
+                    getAllStudents();
+                    break;
+                case 2:
+                    addStudent();
+                    break;
+                case 3:
+                    updateStudent();
+                    break;
+                case 4:
+                    deleteStudent();
+                    break;
+                case 5:
+                    System.out.println("Exiting...");
+                    System.exit(0);
+                default:
+                    System.out.println("Invalid choice. Please enter a number between 1 and 5.");
+            }
+        }
+    }
+}
